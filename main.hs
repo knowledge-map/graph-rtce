@@ -1,7 +1,11 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Main where
 
-import Network.WebSockets (runServer, acceptRequest, receiveDataMessage, DataMessage(..), sendTextData)
+import Network.WebSockets
+    (DataMessage(..),
+     receiveDataMessage, sendTextData,
+     runServer, acceptRequest)
+
 import Control.Monad (forever)
 
 main = runServer "127.0.0.1" 8080 handleConnection
@@ -13,4 +17,4 @@ handleConnection pending = do
         print msg
         case msg of
             Text t -> sendTextData connection t
-            _ -> return ()
+            _else  -> return ()
