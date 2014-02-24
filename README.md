@@ -1,4 +1,4 @@
-playgraph
-=========
+pallygraph
+==========
 
-Collaborative graph editing.
+Edit graphs with your pals.
