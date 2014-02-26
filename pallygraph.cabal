@@ -19,5 +19,9 @@ executable pallygraph
                         websockets,
                         wai-websockets,
                         wai-handler-devel,
+                        blaze-html,
+                        containers,
+                        text,
+                        bytestring,
                         base
   default-language:     Haskell2010
