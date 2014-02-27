@@ -12,16 +12,11 @@ cabal-version:       >=1.10
 executable pallygraph
   ghc-options:          -threaded -Wall -O
   main-is:              App.hs
-  build-depends:        wai,
-                        wai-extra,
-                        warp,
-                        scotty,
-                        websockets,
-                        wai-websockets,
+  build-depends:        wai, wai-extra, warp,
                         wai-handler-devel,
-                        blaze-html,
-                        containers,
-                        text,
-                        bytestring,
+                        websockets, wai-websockets,
+                        scotty, blaze-html,
+                        containers, text, bytestring,
+                        fay, aeson,
                         base
   default-language:     Haskell2010

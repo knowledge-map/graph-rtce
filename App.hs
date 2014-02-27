@@ -17,9 +17,14 @@ import Network.Wai.Middleware.Gzip (gzip, def)
 import Network.Wai.Handler.WebSockets (intercept)
 
 import Text.Blaze.Html5 hiding (head)
+import Text.Blaze.Html5.Attributes
+import qualified Text.Blaze.Html5 as H
 import Text.Blaze.Html.Renderer.Text
 
 import Text.Read (readMaybe)
+
+import Data.Aeson (encode, decode)
+import Fay.Convert (showToFay, readFromFay)
 
 import Control.Monad (void, when, forever)
 import Control.Concurrent.MVar (MVar, newMVar, readMVar, takeMVar, putMVar, modifyMVar_)
@@ -47,21 +52,30 @@ app :: IO Application
 app = scottyApp $ do
     middleware logStdoutDev
     middleware (gzip def)
-    get "/" $ blaze $ h1 "Beam me up, Scotty!"
-    get "/thing.js" $ js "alert('hello!');"
+
+    get "/" $ blaze $ do
+        H.head $ H.script ! src "frontend.js" $ ""
+        H.body $ H.h1 "Beam me up, Scotty!"
+
+    get "/frontend.js" $ js "Frontend.js"
+
     where
         blaze = S.html . renderHtml
-        js  content = S.text content >> setHeader "content-type" "text/javascript"
-        css content = S.text content >> setHeader "content-type" "text/css"
+        js  file = S.file file >> setHeader "content-type" "text/javascript"
+        css file = S.file file >> setHeader "content-type" "text/css"
 
 handleConnection clientsRef graphRef pending = do
     connection <- acceptRequest pending
     modifyMVar_ clientsRef (\cs -> return $ connection:cs)
     forever $ do
-        msg <- fmap unpack $ receiveData connection
-        case readMaybe msg of
+        msg <- receiveData connection
+        case fromFay msg of
             Just edit -> handleClientEvent connection clientsRef graphRef edit
             Nothing -> return ()
+    where
+        fromFay x = case decode x of
+            Just x' -> readFromFay x'
+            Nothing -> Nothing
 
 -- Create a new node, and inform the client if there was an ID collision.
 handleClientEvent client clientsRef graphRef (Create node@(Node id' content)) = do
