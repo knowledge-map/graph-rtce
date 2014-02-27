@@ -1,5 +1,5 @@
 {-# LANGUAGE EmptyDataDecls #-}
-module Frontend where
+module Frontend (main) where
 
 import Prelude
 import DOM
@@ -17,7 +17,7 @@ main = addEvent "load" $ do
             UpdateContent a b c -> putStrLn "updatecontent"
 
 getEdit :: String -> Fay Edit
-getEdit = ffi "JSON.parse(%1)"
+getEdit = ffi "JSON['parse'](%1)"
 
 data WebSocket
 data WebSocketMessage
