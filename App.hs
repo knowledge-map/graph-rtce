@@ -106,7 +106,7 @@ handleClientEvent _client clientsRef graphRef e@(UpdateContent id' old new) = do
 -- Clients should not send other event types.
 handleClientEvent _ _ _ _ = return ()
 
-sendTo client = sendTextData client . pack . show
+sendTo client = sendTextData client . encode . showToFay
 
 broadcast ref e = do
     r <- readMVar ref

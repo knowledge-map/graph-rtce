@@ -8,21 +8,22 @@ import Types
 
 main :: Fay ()
 main = addEvent "load" $ do
-    conn <- openWebSocket "localhost:8000"
+    ws <- newWebSocket "localhost:8000"
+    ws `onMessage` \msg -> do
+        edit <- getData msg >>= getEdit
+        case edit of
+            Create n -> putStrLn "create"
+            UpdateID a b -> putStrLn "updateid"
+            UpdateContent a b c -> putStrLn "updatecontent"
 
-    conn `onMessage` \msg -> do
-        str <- getData msg
-        putStrLn str
-
-    conn `onOpen` do
-        let command = Create { createNode = Node { nodeId = 5, nodeContent = "hi" } }
-         in conn `sendWebSocket` show command
+getEdit :: String -> Fay Edit
+getEdit = ffi "JSON.parse(%1)"
 
 data WebSocket
 data WebSocketMessage
 
-openWebSocket :: String -> Fay WebSocket
-openWebSocket = ffi "new WebSocket('ws://'+%1)"
+newWebSocket :: String -> Fay WebSocket
+newWebSocket = ffi "new WebSocket('ws://'+%1)"
 
 onMessage :: WebSocket -> (WebSocketMessage -> Fay ()) -> Fay ()
 onMessage = ffi "%1['onmessage'] = %2"
@@ -33,5 +34,5 @@ onOpen = ffi "%1['onopen'] = %2"
 getData :: WebSocketMessage -> Fay String
 getData = ffi "%1['data']"
 
-sendWebSocket :: WebSocket -> String -> Fay ()
-sendWebSocket = ffi "%1['send'](%2)"
+sendData :: WebSocket -> String -> Fay ()
+sendData = ffi "%1['send'](%2)"
