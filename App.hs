@@ -20,7 +20,7 @@ import Network.Wai.Handler.WebSockets (intercept)
 
 import Text.Blaze.Html5 hiding (head)
 import qualified Text.Blaze.Html5 as H
-import Text.Blaze.Html5.Attributes (src)
+import qualified Text.Blaze.Html5.Attributes as A
 import Text.Blaze.Html.Renderer.Text (renderHtml)
 
 import Control.Monad (void, when, forever)
@@ -55,12 +55,14 @@ app = scottyApp $ do
 
     get "/frontend.js" $ js "Frontend.js"
     get "/" $ blaze $ do
-        H.head $ H.script ! src "frontend.js" $ ""
-        H.body $ H.h1 "Beam me up, Scotty!"
-        where
-            blaze = S.html . renderHtml
-            js  file = S.file file >> setHeader "content-type" "text/javascript"
-            css file = S.file file >> setHeader "content-type" "text/css"
+        H.head $ H.script "" ! A.src "frontend.js"
+        H.body $ do
+            H.h1 "Beam me up, Scotty!"
+            H.a  "Add node" ! A.id "add"
+    where
+        blaze = S.html . renderHtml
+        js  file = S.file file >> setHeader "content-type" "text/javascript"
+        css file = S.file file >> setHeader "content-type" "text/css"
 
 handleConnection clientsRef graphRef pending = do
     connection <- acceptRequest pending
