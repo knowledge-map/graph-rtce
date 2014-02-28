@@ -12,20 +12,29 @@ main = addEvent "load" $ do
     ws `onMessage` \msg -> getData msg >>= getEdit >>= incoming
 
     adder <- getElementById "add"
-    adder `addEventListener` "mousedown" $ \_ -> do
+    adder `addEventListener` "mousedown" $ \_ ->
         let n = Create { createNode = Node { nodeId = 5, nodeContent = "boo" } }
-        ws `sendData` show n
+         in ws `sendData` show n
 
 incoming :: Edit -> Fay ()
 incoming (Create (Node id content)) = do
     el <- createElement "p"
-    setInnerHtml el (show id ++ " " ++ content)
+    setId el (show id)
+    setInnerHtml el content
+    editable el
     body <- getBody
     appendChild body el
 incoming _ = return ()
 
+editable :: Element -> Fay ()
+editable el = el `addEventListener` "mousedown" $ \_ -> do
+    input <- createElement "input"
+
 setInnerHtml :: Element -> String -> Fay ()
 setInnerHtml = ffi "%1['innerHTML'] = %2"
+
+setId :: Element -> String -> Fay ()
+setId = ffi "%1['id'] = %2"
 
 getEdit :: String -> Fay Edit
 getEdit = ffi "JSON['parse'](%1)"

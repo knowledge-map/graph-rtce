@@ -4,24 +4,19 @@ module Main where
 import Prelude hiding (id)
 
 import Network.Wai
+import Network.Wai.Middleware.RequestLogger (logStdoutDev)
+import Network.Wai.Middleware.Gzip (gzip, def)
 import Network.Wai.Handler.Warp
     (runSettings, defaultSettings, settingsPort, settingsIntercept)
-import Web.Scotty
-    (scottyApp, get, middleware, setHeader)
-import qualified Web.Scotty as S
 
+import Text.Blaze.Html.Renderer.Text (renderHtml)
+import Web.Scotty
+    (scottyApp, get, middleware, setHeader, html, file)
+
+import Network.Wai.Handler.WebSockets (intercept)
 import Network.WebSockets
     (DataMessage(..), PendingConnection, acceptRequest,
      receiveData, sendTextData)
-
-import Network.Wai.Middleware.RequestLogger (logStdoutDev)
-import Network.Wai.Middleware.Gzip (gzip, def)
-import Network.Wai.Handler.WebSockets (intercept)
-
-import Text.Blaze.Html5 hiding (head)
-import qualified Text.Blaze.Html5 as H
-import qualified Text.Blaze.Html5.Attributes as A
-import Text.Blaze.Html.Renderer.Text (renderHtml)
 
 import Control.Monad (void, when, forever)
 import Control.Concurrent.MVar
@@ -32,6 +27,8 @@ import Data.Text (pack, unpack)
 
 import Data.Aeson (encode, decode)
 import Fay.Convert (showToFay, readFromFay)
+
+import Pages.Index
 
 import Types
 type History = [Edit]
@@ -54,15 +51,11 @@ app = scottyApp $ do
     middleware (gzip def)
 
     get "/frontend.js" $ js "Frontend.js"
-    get "/" $ blaze $ do
-        H.head $ H.script "" ! A.src "frontend.js"
-        H.body $ do
-            H.h1 "Beam me up, Scotty!"
-            H.a  "Add node" ! A.id "add"
+    get "/" $ blaze Pages.Index.render
     where
-        blaze = S.html . renderHtml
-        js  file = S.file file >> setHeader "content-type" "text/javascript"
-        css file = S.file file >> setHeader "content-type" "text/css"
+        blaze = html . renderHtml
+        js  f = file f >> setHeader "content-type" "text/javascript"
+        css f = file f >> setHeader "content-type" "text/css"
 
 handleConnection clientsRef graphRef pending = do
     connection <- acceptRequest pending
