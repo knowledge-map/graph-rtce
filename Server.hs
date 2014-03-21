@@ -15,10 +15,11 @@ import Web.Scotty
 
 import Network.Wai.Handler.WebSockets (intercept)
 import Network.WebSockets
-    (DataMessage(..), PendingConnection, acceptRequest,
+    (DataMessage(..), PendingConnection, ConnectionException(..), acceptRequest,
      receiveData, sendTextData)
 
 import Control.Monad (void, when, forever)
+import Control.Exception (handle, fromException)
 import Control.Concurrent.MVar
     (MVar, newMVar, readMVar, takeMVar, putMVar, modifyMVar_)
 
@@ -60,7 +61,7 @@ app = scottyApp $ do
 handleConnection clientsRef graphRef pending = do
     connection <- acceptRequest pending
     modifyMVar_ clientsRef (\cs -> return $ connection:cs)
-    forever $ do
+    handle (catchDisconnect connection) $ forever $ do
         msg <- receiveData connection
         case fromFay msg of
             Just edit -> handleClientEvent connection clientsRef graphRef edit
@@ -69,6 +70,10 @@ handleConnection clientsRef graphRef pending = do
         fromFay x = case decode x of
             Just x' -> readFromFay x'
             Nothing -> Nothing
+        catchDisconnect client e = case fromException e of
+            Just ConnectionClosed -> do
+                liftIO $ putStrLn "Client disconnected"
+                liftIO $ modifyMVar_ clientsRef $ \s -> filter (/= client) s
 
 -- Create a new node, and inform the client if there was an ID collision.
 handleClientEvent client clientsRef graphRef (Create node@(Node id content)) = do
@@ -93,6 +98,9 @@ handleClientEvent _client clientsRef graphRef edit@(UpdateContent id old new) = 
             else (True, M.adjust (\n -> n { nodeContent = new }) id graph)
     putMVar graphRef graph'
     when updated $ broadcast clientsRef edit
+
+-- If someone selects a node, let everyone know to update their UI state.
+handleClientEvent _ clientsRef _ edit = broadcast clientsRef edit
 
 -- Clients should not send other event types.
 handleClientEvent _ _ _ _ = return ()

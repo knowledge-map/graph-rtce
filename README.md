@@ -1,4 +1,3 @@
-pallygraph
-==========
+# graph-rtce
 
-Edit graphs with your pals.
+Real-time collaborative editing for graphs.
