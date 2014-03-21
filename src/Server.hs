@@ -19,6 +19,7 @@ import Network.WebSockets
      receiveData, sendTextData)
 
 import Control.Monad (void, when, forever)
+import Control.Monad.Trans (liftIO)
 import Control.Exception (handle, fromException)
 import Control.Concurrent.MVar
     (MVar, newMVar, readMVar, takeMVar, putMVar, modifyMVar_)
@@ -71,9 +72,9 @@ handleConnection clientsRef graphRef pending = do
             Just x' -> readFromFay x'
             Nothing -> Nothing
         catchDisconnect client e = case fromException e of
-            Just ConnectionClosed -> do
-                liftIO $ putStrLn "Client disconnected"
-                liftIO $ modifyMVar_ clientsRef $ \s -> filter (/= client) s
+            Just ConnectionClosed -> liftIO $ do
+                putStrLn "Client disconnected"
+                modifyMVar_ clientsRef $ return . filter (/= client)
 
 -- Create a new node, and inform the client if there was an ID collision.
 handleClientEvent client clientsRef graphRef (Create node@(Node id content)) = do
