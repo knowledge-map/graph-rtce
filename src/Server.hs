@@ -15,17 +15,16 @@ import Web.Scotty
 
 import Network.Wai.Handler.WebSockets (intercept)
 import Network.WebSockets
-    (DataMessage(..), receiveData, sendTextData,
+    (receiveData, sendTextData,
      PendingConnection, acceptRequest, Connection, ConnectionException(..))
 
-import Control.Monad (void, when, forever)
+import Control.Monad (when, forever)
 import Control.Monad.Trans (liftIO)
 import Control.Exception (handle, fromException)
 import Control.Concurrent.STM
     (STM, TVar, newTVar, readTVar, writeTVar, atomically)
 
 import qualified Data.Map as M
-import Data.Text (pack, unpack)
 
 import Data.Aeson (encode, decode)
 import Fay.Convert (showToFay, readFromFay)
@@ -40,8 +39,8 @@ type Clients = M.Map ID Connection
 main :: IO ()
 main = do
     putStrLn "Serving on http://localhost:8000"
-    graphV <- atomically $ newGraph
-    clientsV <- atomically $ newClients
+    graphV <- newGraph
+    clientsV <- newClients
     let settings = defaultSettings {
         settingsPort = 8000,
         settingsIntercept = intercept (handleConnection clientsV graphV)
@@ -62,13 +61,14 @@ app = scottyApp $ do
 
 {- WebSockets connection handler -}
 
+handleConnection :: TVar Clients -> TVar Graph -> PendingConnection -> IO ()
 handleConnection clientsV graphV pending = do
     connection <- acceptRequest pending
     client <- atomically $ addClient clientsV connection
     handle (catchDisconnect client) $ forever $ do
         msg <- receiveData connection
         case fromFay msg of
-            Just edit -> handleClientEvent client clientsV graphV edit
+            Just edit -> handleClientEvent clientsV graphV client edit
             Nothing -> return ()
     where
         fromFay x = case decode x of
@@ -82,8 +82,10 @@ handleConnection clientsV graphV pending = do
 
 {- Edit event handlers -}
 
+handleClientEvent :: TVar Clients -> TVar Graph -> ID -> Edit -> IO ()
+
 -- Handle an event that creates a new node.
-handleClientEvent client clientsV graphV (Create node@(Node id content)) = do
+handleClientEvent clientsV graphV client (Create node@(Node id content)) = do
     node'@(Node id' content') <- atomically $ insertNode graphV node
     when (id' /= id) $ do
         conn <- atomically $ getConnection clientsV client
@@ -93,24 +95,27 @@ handleClientEvent client clientsV graphV (Create node@(Node id content)) = do
     broadcast clientsV (Create node')
 
 -- Handle node content update events.
-handleClientEvent _client clientsV graphV edit@(UpdateContent id old new) = do
+handleClientEvent clientsV graphV _client edit@(UpdateContent id old new) = do
     updated <- atomically $ updateNodeContent graphV id old new
     when updated $ broadcast clientsV edit
 
 -- All other events are just multiplexed to all clients.
-handleClientEvent _ clientsV _ edit = broadcast clientsV edit
+handleClientEvent clientsV _ _ edit = broadcast clientsV edit
 
 -- Convenience: send an object to a client.
+sendTo :: Connection -> Edit -> IO ()
 sendTo conn e = sendTextData conn . encode . showToFay $ e
 
 -- Convenience: send an object to all clients.
+broadcast :: TVar Clients -> Edit -> IO ()
 broadcast clientsV e = do
     conns <- atomically $ getConnections clientsV
     mapM_ (flip sendTo e) conns
 
 {- Graph data structure and modification -}
 
-newGraph = newTVar M.empty
+newGraph :: IO (TVar Graph)
+newGraph = atomically $ newTVar M.empty
 
 insertNode :: TVar Graph -> Node -> STM Node
 insertNode graphV node@(Node id content) = do
@@ -143,8 +148,10 @@ updateNodeContent graphV id old new = do
 
 {- Connected client registry -}
 
-newClients = newTVar M.empty
+newClients :: IO (TVar Clients) 
+newClients = atomically $ newTVar M.empty
 
+addClient :: TVar Clients -> Connection -> STM ID
 addClient clientsV connection = do
     clients <- readTVar clientsV
     let id = if M.null clients
@@ -153,12 +160,17 @@ addClient clientsV connection = do
     writeTVar clientsV $ M.insert id connection clients
     return id
 
+removeClient :: TVar Clients -> ID -> STM ()
 removeClient clientsV client = do
     clients <- readTVar clientsV
     writeTVar clientsV $ M.delete client clients
 
-getConnection clientsV client = return Nothing
+getConnection :: TVar Clients -> ID -> STM (Maybe Connection)
+getConnection clientsV client = do
+    clients <- readTVar clientsV
+    return $ M.lookup client clients
 
+getConnections :: TVar Clients -> STM [Connection]
 getConnections clientsV = do
     clients <- readTVar clientsV
     return (M.elems clients)
