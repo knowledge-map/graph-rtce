@@ -11,15 +11,13 @@ cabal-version:       >=1.18
 executable graph-rtce
   hs-source-dirs:       src
   main-is:              Server.hs
-  build-depends:        scotty == 0.6.2,
-                        type-eq == 0.4,
-                        wai, wai-extra, wai-handler-devel, warp,
+  build-depends:        scotty == 0.6.2, blaze-html,
+                        wai, wai-extra, warp,
                         websockets, wai-websockets,
-                        blaze-html,
+                        fay, aeson,
+                        mtl, stm,
                         containers, text, bytestring,
-                        fay,
-                        aeson,
-                        mtl,
+                        type-eq == 0.4,
                         base >= 4.6
   ghc-options:          -threaded -Wall -O
   default-language:     Haskell2010
