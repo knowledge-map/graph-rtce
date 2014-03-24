@@ -19,7 +19,6 @@ import Network.WebSockets
      PendingConnection, acceptRequest, Connection, ConnectionException(..))
 
 import Control.Monad (when, forever)
-import Control.Monad.Trans (liftIO)
 import Control.Exception (handle, fromException)
 import Control.Concurrent.STM
     (STM, TVar, newTVar, readTVar, writeTVar, atomically)
@@ -29,22 +28,18 @@ import qualified Data.Map as M
 import Data.Aeson (encode, decode)
 import Fay.Convert (showToFay, readFromFay)
 
-import Pages.Index
-
 import Types
-type History = [Edit]
-type Graph = M.Map ID Node
-type Clients = M.Map ID Connection
+import Pages.Index
 
 main :: IO ()
 main = do
-    putStrLn "Serving on http://localhost:8000"
     graphV <- newGraph
     clientsV <- newClients
     let settings = defaultSettings {
         settingsPort = 8000,
         settingsIntercept = intercept (handleConnection clientsV graphV)
      }
+    putStrLn "Serving on http://localhost:8000"
     runSettings settings =<< app
 
 app :: IO Application
@@ -52,12 +47,12 @@ app = scottyApp $ do
     middleware logStdoutDev
     middleware (gzip def)
 
-    get "/frontend.js" $ js "Frontend.js"
+    get "/js/app.js" $ js "js/app.js"
     get "/" $ blaze Pages.Index.render
     where
         blaze = html . renderHtml
         js  f = file f >> setHeader "content-type" "text/javascript"
-        css f = file f >> setHeader "content-type" "text/css"
+        --css f = file f >> setHeader "content-type" "text/css"
 
 {- WebSockets connection handler -}
 
@@ -65,6 +60,7 @@ handleConnection :: TVar Clients -> TVar Graph -> PendingConnection -> IO ()
 handleConnection clientsV graphV pending = do
     connection <- acceptRequest pending
     client <- atomically $ addClient clientsV connection
+    putStrLn $ "Client " ++ show client ++ " connected"
     handle (catchDisconnect client) $ forever $ do
         msg <- receiveData connection
         case fromFay msg of
@@ -75,18 +71,19 @@ handleConnection clientsV graphV pending = do
             Just x' -> readFromFay x'
             Nothing -> Nothing
         catchDisconnect client e = case fromException e of
-            Just ConnectionClosed -> liftIO $ do
-                putStrLn "Client disconnected"
+            -- This is backwards and needs to be fixed.
+            Just ConnectionClosed -> return ()
+            _otherwise -> do
+                putStrLn $ "Client " ++ show client ++ " disconnected"
                 atomically $ removeClient clientsV client
-            _otherwise -> return ()
 
 {- Edit event handlers -}
 
 handleClientEvent :: TVar Clients -> TVar Graph -> ID -> Edit -> IO ()
 
 -- Handle an event that creates a new node.
-handleClientEvent clientsV graphV client (Create node@(Node id content)) = do
-    node'@(Node id' content') <- atomically $ insertNode graphV node
+handleClientEvent clientsV graphV client (Create node@(Node id _)) = do
+    node'@(Node id' _) <- atomically $ insertNode graphV node
     when (id' /= id) $ do
         conn <- atomically $ getConnection clientsV client
         case conn of
@@ -114,6 +111,8 @@ broadcast clientsV e = do
 
 {- Graph data structure and modification -}
 
+type Graph = M.Map ID Node
+
 newGraph :: IO (TVar Graph)
 newGraph = atomically $ newTVar M.empty
 
@@ -137,7 +136,7 @@ updateNodeContent graphV id old new = do
     -- 'old'. If the content doesn't match, the edit is outdated.
     node' <- case M.lookup id graph of
         Nothing -> return (Node id old)
-        Just node@(Node _ content) ->
+        Just (Node _ content) ->
             if content == old
                 then return (Node id new)
                 else return (Node id old)
@@ -147,6 +146,8 @@ updateNodeContent graphV id old new = do
         else return False
 
 {- Connected client registry -}
+
+type Clients = M.Map ID Connection
 
 newClients :: IO (TVar Clients) 
 newClients = atomically $ newTVar M.empty
