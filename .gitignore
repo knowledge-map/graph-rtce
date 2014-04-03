@@ -6,4 +6,3 @@ cabal-dev
 *.chs.h
 cabal.sandbox.config
 .cabal-sandbox/*
-js/

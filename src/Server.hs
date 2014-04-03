@@ -3,6 +3,8 @@ module Main where
 
 import Prelude hiding (id)
 
+import System.Environment (getArgs)
+
 import Network.Wai
 import Network.Wai.Middleware.RequestLogger (logStdoutDev)
 import Network.Wai.Middleware.Gzip (gzip, def)
@@ -35,8 +37,9 @@ main :: IO ()
 main = do
     graphV <- newGraph
     clientsV <- newClients
+    port <- fmap (read . head) getArgs
     let settings = defaultSettings {
-        settingsPort = 8000,
+        settingsPort = port,
         settingsIntercept = intercept (handleConnection clientsV graphV)
      }
     putStrLn "Serving on http://localhost:8000"
