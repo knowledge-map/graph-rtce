@@ -11,7 +11,7 @@ cabal-version:       >=1.18
 executable graph-rtce
   hs-source-dirs:       src
   main-is:              Server.hs
-  build-depends:        scotty == 0.6.2, blaze-html,
+  build-depends:        scotty >= 0.6.2, blaze-html,
                         wai, wai-extra, warp,
                         websockets, wai-websockets,
                         fay, aeson,

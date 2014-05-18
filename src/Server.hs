@@ -9,16 +9,17 @@ import Network.Wai
 import Network.Wai.Middleware.RequestLogger (logStdoutDev)
 import Network.Wai.Middleware.Gzip (gzip, def)
 import Network.Wai.Handler.Warp
-    (runSettings, defaultSettings, settingsPort, settingsIntercept)
+    (runSettings, defaultSettings, setPort)
 
 import Text.Blaze.Html.Renderer.Text (renderHtml)
 import Web.Scotty
     (scottyApp, get, middleware, setHeader, html, file)
 
-import Network.Wai.Handler.WebSockets (intercept)
+import Network.Wai.Handler.WebSockets (websocketsOr)
 import Network.WebSockets
     (receiveData, sendTextData,
-     PendingConnection, acceptRequest, Connection, ConnectionException(..))
+     PendingConnection, acceptRequest, Connection, ConnectionException(..),
+     defaultConnectionOptions)
 
 import Control.Monad (when, forever)
 import Control.Exception (handle, fromException)
@@ -38,15 +39,17 @@ main = do
     graphV <- newGraph
     clientsV <- newClients
     port <- fmap (read . head) getArgs
-    let settings = defaultSettings {
-        settingsPort = port,
-        settingsIntercept = intercept (handleConnection clientsV graphV)
-     }
+    home <- site
+    let settings = setPort port defaultSettings
+        app = websocketsOr
+                defaultConnectionOptions
+                (handleConnection clientsV graphV)
+                home
     putStrLn "Serving on http://localhost:8000"
-    runSettings settings =<< app
+    runSettings settings app
 
-app :: IO Application
-app = scottyApp $ do
+site :: IO Application
+site = scottyApp $ do
     middleware logStdoutDev
     middleware (gzip def)
 
