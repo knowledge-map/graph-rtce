@@ -20,4 +20,5 @@ executable graph-rtce
                         type-eq == 0.4,
                         base >= 4.6
   ghc-options:          -threaded -Wall -O
+  extensions:           ParallelListComp
   default-language:     Haskell2010
